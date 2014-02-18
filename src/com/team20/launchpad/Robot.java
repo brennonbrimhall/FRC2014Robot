@@ -47,7 +47,7 @@ public class Robot extends IterativeRobot {
     
     //Auto
     int autonomousMode = 1;
-    final int kCloseOneBall = 1, kFarOneBall = 2;
+    final int kCloseOneBall = 1, kFarOneBall = 2, kTwoBall = 3;
     
     int counter = 0;
     
@@ -97,7 +97,6 @@ public class Robot extends IterativeRobot {
     public void periodic(){
         //Update subsystems
         collector.update();
-        catapult.update();
         compressor.start();
         System.out.println("L:\t"+drivetrain.getLeftDistance());
         System.out.println("R:\t"+drivetrain.getRightDistance());
@@ -110,6 +109,18 @@ public class Robot extends IterativeRobot {
             autonomousMode = 1;
         }else if(DriverStation.getInstance().getDigitalIn(2)){
             autonomousMode = 2;
+        }else if(DriverStation.getInstance().getDigitalIn(3)){
+            autonomousMode = 3;
+        }else if(DriverStation.getInstance().getDigitalIn(4)){
+            autonomousMode = 4;
+        }else if(DriverStation.getInstance().getDigitalIn(5)){
+            autonomousMode = 5;
+        }else if(DriverStation.getInstance().getDigitalIn(6)){
+            autonomousMode = 6;
+        }else if(DriverStation.getInstance().getDigitalIn(7)){
+            autonomousMode = 7;
+        }else if(DriverStation.getInstance().getDigitalIn(8)){
+            autonomousMode = 8;
         }
     }
     
@@ -126,12 +137,16 @@ public class Robot extends IterativeRobot {
             case kFarOneBall:
                 farOneBallPeriodic();
                 break;
+            case kTwoBall:
+                twoBallPeriodic();
+                break;
             default:
                 break;
         }
     }
     
     public void closeOneBallPeriodic(){
+        catapult.update();
         drivetrain.lowGear();
         if(counter < 20){
             //Waiting for panels and collector to come out
@@ -140,7 +155,6 @@ public class Robot extends IterativeRobot {
             if(drivetrain.getLeftDistance() < 1100){
                 drivetrain.arcadeDrive(-1, 0);
             }else{
-                System.out.println("Counter:"+counter);
                 drivetrain.arcadeDrive(0, 0);
             }
             
@@ -154,6 +168,8 @@ public class Robot extends IterativeRobot {
     }
     
     public void farOneBallPeriodic(){
+        catapult.update();
+        drivetrain.lowGear();
         if(counter < 40){
             //Wait for stuff to open
             backPanel.bloom();
@@ -161,8 +177,47 @@ public class Robot extends IterativeRobot {
             catapult.shoot();
             drivetrain.arcadeDrive(0, 0);
         }else{
+            if(drivetrain.getLeftDistance() < 1100){
+                drivetrain.arcadeDrive(-1, 0);
+            }else{
+                drivetrain.arcadeDrive(0, 0);
+            }
+        }
+    }
+    
+    public void twoBallPeriodic(){
+        catapult.update(20);
+        drivetrain.lowGear();
+        if(counter < 40){
+            //Wait for stuff to open
+            backPanel.bloom();
+        }else if (counter < 50){
+            catapult.shoot();
+            drivetrain.arcadeDrive(0, 0);
+        }else if (counter < 250){
+            //catapult.engageMotors();
+            if(drivetrain.getLeftDistance() < 1300){
+                drivetrain.arcadeDrive(-1, 0);
+                leftPanel.bloom();
+                rightPanel.bloom();
+                backPanel.bloom();
+                collector.drive();
+            }else{
+                System.out.println("Counter:"+counter);
+                drivetrain.arcadeDrive(0, 0);
+                leftPanel.wilt();
+                rightPanel.wilt();
+            }
+        }else if (counter < 260){
+            //catapult.engageMotors();
+            catapult.shoot();
+            drivetrain.arcadeDrive(0, 0);
+            leftPanel.wilt();
+            rightPanel.wilt();
+        }else{
             //Ratchet back
             drivetrain.arcadeDrive(0, 0);
+            collector.stop();
         }
     }
     
@@ -171,6 +226,7 @@ public class Robot extends IterativeRobot {
         leftPanel.bloom();
         backPanel.bloom();
         rightPanel.bloom();
+        drivetrain.highGear();
     }
     
     /**
@@ -178,6 +234,7 @@ public class Robot extends IterativeRobot {
      */
     public void teleopPeriodic() {
         periodic();
+        catapult.update();
         
         //catapult.drive(operatorController.getLeftY());
         
@@ -197,6 +254,7 @@ public class Robot extends IterativeRobot {
             }else {
                 catapult.engageMotors();
                 catapult.shoot();
+                collector.backdrive();
                 
                 //collector.bloom();
             }

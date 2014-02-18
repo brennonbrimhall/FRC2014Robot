@@ -35,7 +35,7 @@ public class Catapult extends Subsystem {
     
     DigitalInput bumpSwitch = new DigitalInput(2);
     
-    public void update() {
+    public void update(int cyclesToWait) {
         if(state == kEngaging){
             //Engage motors and ratchet
             engageMotors();
@@ -81,13 +81,17 @@ public class Catapult extends Subsystem {
             //Waiting as the mechanics fire
             counter++;
             drive(0);
-            if(counter < 150){
+            if(counter < cyclesToWait){
                 disengageRatchet();
             }else{
                 //Resuming enganging sequence
                 state = kEngaging;
             }
         }
+    }
+    
+    public void update(){
+        update(150);
     }
     
     public void drive(double speed) {
