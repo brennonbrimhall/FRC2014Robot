@@ -36,7 +36,7 @@ public class Robot extends IterativeRobot {
     LogitechDualActionController operatorController;
     JoystickButton button1, button2, button3, button4, button5, button6, button7, button8, button9, button10;
     boolean previousDPadUp = false, previousDPadLeft = false, previousDPadRight = false, previousDPadDown = false;
-    boolean allPanelsBlooming = true;
+    boolean allPanelsBlooming = false;
     
     Drivetrain drivetrain;
     Collector collector;
@@ -47,7 +47,7 @@ public class Robot extends IterativeRobot {
     
     //Auto
     int autonomousMode = 1;
-    final int kOneBall = 1, kTwoBall = 2;
+    final int kCloseOneBall = 1, kFarOneBall = 2;
     
     int counter = 0;
     
@@ -91,9 +91,6 @@ public class Robot extends IterativeRobot {
     
     public void init(){
         collector.bloom();
-        leftPanel.bloom();
-        backPanel.bloom();
-        rightPanel.bloom();
         drivetrain.resetEncoders();
     }
     
@@ -123,31 +120,31 @@ public class Robot extends IterativeRobot {
         counter++;
         periodic();
         switch(autonomousMode){
-            case kOneBall:
-                oneBallPeriodic();
+            case kCloseOneBall:
+                closeOneBallPeriodic();
                 break;
-            case kTwoBall:
-                twoBallPeriodic();
+            case kFarOneBall:
+                farOneBallPeriodic();
                 break;
             default:
                 break;
         }
     }
     
-    public void oneBallPeriodic(){
+    public void closeOneBallPeriodic(){
         drivetrain.lowGear();
         if(counter < 20){
             //Waiting for panels and collector to come out
         
-        }else if(counter < 250){
+        }else if(counter < 170){
             if(drivetrain.getLeftDistance() < 1100){
-                drivetrain.arcadeDrive(-.5, 0);
+                drivetrain.arcadeDrive(-1, 0);
             }else{
-                //System.out.println("Counter:"+counter);
+                System.out.println("Counter:"+counter);
                 drivetrain.arcadeDrive(0, 0);
             }
             
-        }else if(counter < 260){
+        }else if(counter < 180){
             catapult.shoot();
             drivetrain.arcadeDrive(0, 0);
         }else{
@@ -156,12 +153,24 @@ public class Robot extends IterativeRobot {
         }
     }
     
-    public void twoBallPeriodic(){
-        
+    public void farOneBallPeriodic(){
+        if(counter < 40){
+            //Wait for stuff to open
+            backPanel.bloom();
+        }else if (counter < 50){
+            catapult.shoot();
+            drivetrain.arcadeDrive(0, 0);
+        }else{
+            //Ratchet back
+            drivetrain.arcadeDrive(0, 0);
+        }
     }
     
     public void teleopInit(){
         init();
+        leftPanel.bloom();
+        backPanel.bloom();
+        rightPanel.bloom();
     }
     
     /**
