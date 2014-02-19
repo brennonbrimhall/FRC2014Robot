@@ -138,4 +138,8 @@ public class Catapult extends Subsystem {
     public void engage(){
         state = kEngaging;
     }
+    
+    public boolean isRetracting(){
+        return state == kRetracting;
+    }
 }
