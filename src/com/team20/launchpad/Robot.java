@@ -45,9 +45,11 @@ public class Robot extends IterativeRobot {
     Catapult catapult;
     CatcherPanel rightPanel, leftPanel, backPanel;
     
+    //Vision vision;
+    
     //Auto
     int autonomousMode = 1;
-    final int kCloseOneBall = 1, kFarOneBall = 2, kTwoBall = 3;
+    final int kCloseOneBall = 1, kFarOneBall = 2, kFarOneBallDriveBack = 3, kTwoBall = 4;
     
     int counter = 0;
     
@@ -87,6 +89,9 @@ public class Robot extends IterativeRobot {
         button8 = operatorController.getButton(8);
         button9 = operatorController.getButton(9);
         button10 = operatorController.getButton(10);
+        
+        //Initializing comms for Beaglebone
+        //vision = new Vision();
     }
     
     public void init(){
@@ -97,9 +102,13 @@ public class Robot extends IterativeRobot {
     public void periodic(){
         //Update subsystems
         collector.update();
-        compressor.start();
-        System.out.println("L:\t"+drivetrain.getLeftDistance());
-        System.out.println("R:\t"+drivetrain.getRightDistance());
+        if(catapult.isRetracting()){
+            compressor.stop();
+        }else{
+            compressor.start();
+        }
+        
+        //System.out.println("Vision:\t"+vision.getHorizontalDetected());
     }
     
     public void autonomousInit(){
@@ -137,6 +146,9 @@ public class Robot extends IterativeRobot {
             case kFarOneBall:
                 farOneBallPeriodic();
                 break;
+            case kFarOneBallDriveBack:
+                farOneBallDriveBackPeriodic();
+                break;
             case kTwoBall:
                 twoBallPeriodic();
                 break;
@@ -168,7 +180,7 @@ public class Robot extends IterativeRobot {
     }
     
     public void farOneBallPeriodic(){
-        catapult.update();
+        catapult.update(30);
         drivetrain.lowGear();
         if(counter < 40){
             //Wait for stuff to open
@@ -176,11 +188,43 @@ public class Robot extends IterativeRobot {
         }else if (counter < 50){
             catapult.shoot();
             drivetrain.arcadeDrive(0, 0);
-        }else{
+        }else if (counter < 230){
             if(drivetrain.getLeftDistance() < 1100){
                 drivetrain.arcadeDrive(-1, 0);
+                collector.drive();
             }else{
                 drivetrain.arcadeDrive(0, 0);
+            }
+        }else{
+            drivetrain.arcadeDrive(0, 0);
+            collector.stop();
+        }
+    }
+    
+    public void farOneBallDriveBackPeriodic(){
+        catapult.update(30);
+        drivetrain.lowGear();
+        if(counter < 40){
+            //Wait for stuff to open
+            backPanel.bloom();
+        }else if (counter < 50){
+            catapult.shoot();
+            drivetrain.arcadeDrive(0, 0);
+        }else if (counter < 230){
+            if(drivetrain.getLeftDistance() < 1100){
+                drivetrain.arcadeDrive(-1, 0);
+                collector.drive();
+            }else{
+                drivetrain.arcadeDrive(0, 0);
+            }
+        }else{
+            if(drivetrain.getLeftDistance() > 0){
+                drivetrain.arcadeDrive(1, 0);
+            }else{
+                drivetrain.arcadeDrive(0, 0);
+                //backPanel.wilt();
+                collector.stop();
+                //collector.wilt();
             }
         }
     }
@@ -248,24 +292,22 @@ public class Robot extends IterativeRobot {
         }
         
         //Set catapult state to shoot
-        if (button5.get()) {
+        if (button5.get() && button7.get()) {
             if(collector.isBloomed()){
                 catapult.shoot();
             }else {
                 catapult.engageMotors();
                 catapult.shoot();
                 collector.backdrive();
-                
                 //collector.bloom();
             }
-            //catapult.disengageRatchet();
-        }else if(button7.get()){
-            catapult.engageMotors();
         }
+            //catapult.disengageRatchet();
         
         if(button9.get()){
             catapult.engage();
         }else if(button10.get()){
+            catapult.engageMotors();
         }
 
         //Setting collector position
@@ -339,5 +381,9 @@ public class Robot extends IterativeRobot {
         catapult.update();
         
         drivetrain.lowGear();
+    }
+    
+    public void disabledPeriodic(){
+        //System.out.println("Vision:\t"+vision.getHorizontalDetected());
     }
 }
