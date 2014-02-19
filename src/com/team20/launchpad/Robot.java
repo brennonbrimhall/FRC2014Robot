@@ -240,7 +240,7 @@ public class Robot extends IterativeRobot {
             drivetrain.arcadeDrive(0, 0);
         }else if (counter < 250){
             //catapult.engageMotors();
-            if(drivetrain.getLeftDistance() < 1300){
+            if(drivetrain.getLeftDistance() < (1300*1.25)){
                 drivetrain.arcadeDrive(-1, 0);
                 leftPanel.bloom();
                 rightPanel.bloom();
