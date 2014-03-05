@@ -1,3 +1,4 @@
+
 /*----------------------------------------------------------------------------*/
 /* Copyright (c) FIRST 2008. All Rights Reserved.                             */
 /* Open Source Software - may be modified and shared by FRC teams. The code   */
@@ -9,6 +10,7 @@ package com.team20.launchpad;
 
 
 import edu.wpi.first.wpilibj.Compressor;
+import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.IterativeRobot;
@@ -54,7 +56,7 @@ public class Robot extends IterativeRobot {
     int counter = 0;
     
     public void robotInit() {
-        //Initializing and starting compressor
+         //Initializing and starting compressor
         compressor = new Compressor(1, 1);
         compressor.start();
         
@@ -180,7 +182,7 @@ public class Robot extends IterativeRobot {
     }
     
     public void farOneBallPeriodic(){
-        catapult.update(30);
+        catapult.update(30, 30);
         drivetrain.lowGear();
         if(counter < 40){
             //Wait for stuff to open
@@ -202,7 +204,7 @@ public class Robot extends IterativeRobot {
     }
     
     public void farOneBallDriveBackPeriodic(){
-        catapult.update(30);
+        catapult.update(30, 30);
         drivetrain.lowGear();
         if(counter < 40){
             //Wait for stuff to open
@@ -230,7 +232,7 @@ public class Robot extends IterativeRobot {
     }
     
     public void twoBallPeriodic(){
-        catapult.update(20);
+        catapult.update(20, 30);
         drivetrain.lowGear();
         if(counter < 40){
             //Wait for stuff to open
@@ -279,7 +281,7 @@ public class Robot extends IterativeRobot {
     public void teleopPeriodic() {
         periodic();
         catapult.update();
-        
+      
         //catapult.drive(operatorController.getLeftY());
         
         //Drive the robot
@@ -295,20 +297,23 @@ public class Robot extends IterativeRobot {
         if (button5.get() && button7.get()) {
             if(collector.isBloomed()){
                 catapult.shoot();
-            }else {
+            } else {
                 catapult.engageMotors();
-                catapult.shoot();
+                catapult.softShoot();
                 collector.backdrive();
                 //collector.bloom();
             }
+        }else if(button10.get()){
+            catapult.softShoot();
+            collector.backdrive();
         }
             //catapult.disengageRatchet();
         
         if(button9.get()){
             catapult.engage();
-        }else if(button10.get()){
-            catapult.engageMotors();
-        }
+        }//else if(button10.get()){
+            //catapult.engageMotors();
+        //}
 
         //Setting collector position
         if (button6.get()) {

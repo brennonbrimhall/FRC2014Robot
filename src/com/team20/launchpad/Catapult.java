@@ -17,12 +17,19 @@ public class Catapult extends Subsystem {
     
     private final int kEngaging = 1;
     private final int kRetracting = 2;
-    private final int kDisengaging = 3;
-    private final int kIdling1 = 4;
-    private final int kShooting = 5;
-    private final int kIdling2 = 6;
+    private final int kIdling1 = 3;
     
-    private final int kSoftShooting = 7;
+    //Shooting full
+    private final int kDisengaging = 4;
+    private final int kIdling2 = 5;
+    private final int kShooting = 6;
+    private final int kIdling3 = 7;
+    
+    //Shooting softly
+    private final int kRedundantlyEngaging = 8;
+    private final int kIdling4 = 9;
+    private final int kShootingSoft = 10;
+    private final int kIdling5 = 11;
     
     private int state = 1;
     private int counter;
@@ -35,7 +42,7 @@ public class Catapult extends Subsystem {
     
     DigitalInput bumpSwitch = new DigitalInput(2);
     
-    public void update(int cyclesToWait) {
+    public void update(int cyclesToWait, int cyclesToWaitSoft) {
         if(state == kEngaging){
             //Engage motors and ratchet
             engageMotors();
@@ -58,30 +65,76 @@ public class Catapult extends Subsystem {
                 //Move on to disengaging
                 state++;
             }
+        }else if(state == kIdling1){
+            //Keep motors engaged and do nothing
+            engageMotors();
+            drive(0);
+            //Don't automatically move on to shooting
+            
         }else if(state == kDisengaging){
             //Disengaging motors
             disengageMotors();
             //Move on to idling
             state++;
-        }else if(state == kIdling1){
-            //Do nothing
-            //disengageMotors();
+            counter = 0;
+        }else if (state == kIdling2){
+            //Backdriving gearbox slightly
+            disengageMotors();
             drive(0);
-            //Don't automatically move on to shooting
+            if(counter < 10){
+                counter++;
+            }else{
+                state++;
+            }
+            
         }else if(state == kShooting){
             //Disengaging ratchet and firing
             disengageRatchet();
-            //disengageMotors();
+            disengageMotors();
             drive(0);
             
             //Resetting counter
             counter = 0;
             state++;
-        }else if(state == kIdling2){
+        }else if(state == kIdling3){
             //Waiting as the mechanics fire
             counter++;
             drive(0);
             if(counter < cyclesToWait){
+                disengageRatchet();
+                disengageMotors();
+            }else{
+                //Resuming enganging sequence
+                state = kEngaging;
+            }
+        }else if(state == kRedundantlyEngaging){
+            //Engaging motors
+            engageMotors();
+            //Move on to idling
+            state++;
+            counter = 0;
+        }else if (state == kIdling4){
+            //Backdriving gearbox slightly
+            drive(0);
+            if(counter < 10){
+                counter++;
+            }else{
+                state++;
+            }
+        }else if(state == kShootingSoft){
+            //Disengaging ratchet and firing
+            disengageRatchet();
+            engageMotors();
+            drive(0);
+            
+            //Resetting counter
+            counter = 0;
+            state++;
+        }else if(state == kIdling5){
+            //Waiting as the mechanics fire
+            counter++;
+            drive(0);
+            if(counter < cyclesToWaitSoft){
                 disengageRatchet();
             }else{
                 //Resuming enganging sequence
@@ -91,7 +144,7 @@ public class Catapult extends Subsystem {
     }
     
     public void update(){
-        update(150);
+        update(30, 150);
     }
     
     public void drive(double speed) {
@@ -128,11 +181,11 @@ public class Catapult extends Subsystem {
     }
     
     public void shoot(){
-        state = kShooting;
+        state = kDisengaging;
     }
     
     public void softShoot(){
-        state = kSoftShooting;
+        state = kRedundantlyEngaging;
     }
     
     public void engage(){
