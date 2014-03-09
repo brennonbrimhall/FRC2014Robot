@@ -188,7 +188,7 @@ public class Catapult extends Subsystem {
         state = kRedundantlyEngaging;
     }
     
-    public void engage(){
+    public void retract(){
         state = kEngaging;
     }
     
