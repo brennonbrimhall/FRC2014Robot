@@ -47,13 +47,22 @@ public class Robot extends IterativeRobot {
     Catapult catapult;
     CatcherPanel rightPanel, leftPanel, backPanel;
     
-    //Vision vision;
+    Vision vision = new Vision();
+    
+    //Boolean to store hot or not
+    boolean hot = false;
     
     //Auto
     int autonomousMode = 1;
-    final int kCloseOneBall = 1, kFarOneBall = 2, kFarOneBallDriveBack = 3, kTwoBall = 4;
-    
-    int counter = 0;
+    final int kCloseOneBall = 1, kFarOneBall = 2, kFarOneBallDriveBack = 3,
+            kTwoBall = 4, kHotOneBall = 5;
+    final int kMobility = -2, kStop = -1, kBlooming = 0, kProcessing = 1, kShooting = 2,
+            kIdling = 3, kDrivingForward = 4, kGettingBall = 5, kTurning = 6, kShooting2 = 7,
+            kIdling2 = 8, kTurning2 = 9;
+    int state = kBlooming,counter = 0;
+    long previousSystemTime = System.currentTimeMillis();
+    long autoStartTime = 0;
+    boolean firstBallShot = false, secondBallShot = false;
     
     public void robotInit() {
          //Initializing and starting compressor
@@ -93,7 +102,7 @@ public class Robot extends IterativeRobot {
         button10 = operatorController.getButton(10);
         
         //Initializing comms for Beaglebone
-        //vision = new Vision();
+        vision.startThread();
     }
     
     public void init(){
@@ -110,11 +119,18 @@ public class Robot extends IterativeRobot {
             compressor.start();
         }
         
-        //System.out.println("Vision:\t"+vision.getHorizontalDetected());
+        //Calculate method call cycle time
+        /*long currentTime = System.currentTimeMillis();
+        long delta = currentTime - previousSystemTime;
+        System.out.println(delta+"ms per cycle.");
+        previousSystemTime = currentTime;*/
+        System.out.println("Left:\t"+drivetrain.getLeftDistance());
     }
     
     public void autonomousInit(){
         init();
+        vision.startThread();
+        autoStartTime = System.currentTimeMillis();
         counter = 0;
         if(DriverStation.getInstance().getDigitalIn(1)){
             autonomousMode = 1;
@@ -154,6 +170,9 @@ public class Robot extends IterativeRobot {
             case kTwoBall:
                 twoBallPeriodic();
                 break;
+            case kHotOneBall:
+                hotOneBallPeriodic();
+                break;
             default:
                 break;
         }
@@ -166,7 +185,7 @@ public class Robot extends IterativeRobot {
             //Waiting for panels and collector to come out
         
         }else if(counter < 170){
-            if(drivetrain.getLeftDistance() < 1100){
+            if(drivetrain.getLeftDistance() > -300){
                 drivetrain.arcadeDrive(-1, 0);
             }else{
                 drivetrain.arcadeDrive(0, 0);
@@ -187,11 +206,14 @@ public class Robot extends IterativeRobot {
         if(counter < 40){
             //Wait for stuff to open
             backPanel.bloom();
+            drivetrain.arcadeDrive(0, 0);
         }else if (counter < 50){
             catapult.shoot();
             drivetrain.arcadeDrive(0, 0);
+        }else if (counter < 100){
+            drivetrain.arcadeDrive(0, 0);
         }else if (counter < 230){
-            if(drivetrain.getLeftDistance() < 1100){
+            if(drivetrain.getLeftDistance() > -700){
                 drivetrain.arcadeDrive(-1, 0);
                 collector.drive();
             }else{
@@ -209,18 +231,22 @@ public class Robot extends IterativeRobot {
         if(counter < 40){
             //Wait for stuff to open
             backPanel.bloom();
+            drivetrain.arcadeDrive(0, 0);
         }else if (counter < 50){
             catapult.shoot();
             drivetrain.arcadeDrive(0, 0);
-        }else if (counter < 230){
-            if(drivetrain.getLeftDistance() < 1100){
+        }else if (counter < 100){
+            //Waiting for shoot sequence
+            drivetrain.arcadeDrive(0, 0);
+        }else if (counter < 250){
+            if(drivetrain.getLeftDistance() > -700){
                 drivetrain.arcadeDrive(-1, 0);
                 collector.drive();
             }else{
                 drivetrain.arcadeDrive(0, 0);
             }
         }else{
-            if(drivetrain.getLeftDistance() > 0){
+            if(drivetrain.getLeftDistance() < 0){
                 drivetrain.arcadeDrive(1, 0);
             }else{
                 drivetrain.arcadeDrive(0, 0);
@@ -232,38 +258,186 @@ public class Robot extends IterativeRobot {
     }
     
     public void twoBallPeriodic(){
+        System.out.println(counter);
         catapult.update(20, 30);
         drivetrain.lowGear();
         if(counter < 40){
             //Wait for stuff to open
             backPanel.bloom();
-        }else if (counter < 50){
-            catapult.shoot();
-            drivetrain.arcadeDrive(0, 0);
-        }else if (counter < 250){
-            //catapult.engageMotors();
-            if(drivetrain.getLeftDistance() < (1300*1.25)){
+            collector.bloom();
+        }else if (counter < 100){
+            if(drivetrain.getLeftDistance() > -150){
                 drivetrain.arcadeDrive(-1, 0);
-                leftPanel.bloom();
-                rightPanel.bloom();
-                backPanel.bloom();
+            }else{
+                drivetrain.arcadeDrive(0, 0);
+            }
+        }else if (counter < 110){
+            drivetrain.arcadeDrive(0, 0);
+            catapult.shoot();
+        }else if (counter < 150){
+            //Staying still while catapult shoots
+            drivetrain.arcadeDrive(0, 0);
+        }else if (counter < 300){
+            if(drivetrain.getLeftDistance() > -850){
+                collector.drive();
+                drivetrain.arcadeDrive(-1, 0);
+            }else{
+                collector.stop();
+                drivetrain.arcadeDrive(0, 0);
+            }
+        }else if (counter < 350){
+            collector.wilt();
+            drivetrain.arcadeDrive(0, 0);
+        }else if (counter < 360){
+            collector.bloom();
+            drivetrain.arcadeDrive(0, 0);
+        }else if (counter < 370){
+            drivetrain.arcadeDrive(0, 0);
+            catapult.shoot();
+        }
+    }
+    
+    public void hotOneBallPeriodic(){
+        /*catapult.update(30, 30);
+        drivetrain.lowGear();
+        if(counter < 40){
+            //Wait for stuff to open
+            backPanel.bloom();
+            drivetrain.arcadeDrive(0, 0);
+            if(vision.isHorizontalInfoUpdatedTwice()){
+                if(vision.isHorizontalDetectedFirstUpdate() || vision.isHorizontalDetectedSecondUpdate()){
+                    hot = true;
+                }else{
+                    hot = false;
+                }
+            }
+        }else if (counter < (5000/20)){
+            if(hot){
+                if(counter < 50){
+                    catapult.shoot();
+                    drivetrain.arcadeDrive(0, 0);
+                }else{
+                    if(drivetrain.getLeftDistance() > -700){
+                        drivetrain.arcadeDrive(-1, 0);
+                    }else{
+                        drivetrain.arcadeDrive(0, 0);
+                    }
+                }
+            }else{
+                if(drivetrain.getLeftDistance() > -700){
+                    drivetrain.arcadeDrive(-1, 0);
+                }else{
+                    drivetrain.arcadeDrive(0, 0);
+                }
+            }
+        }else if (counter < (10000/20)){
+            if(!hot){
+                if(counter < 50){
+                    catapult.shoot();
+                    drivetrain.arcadeDrive(0, 0);
+                }else{
+                    if(drivetrain.getLeftDistance() > -700){
+                        drivetrain.arcadeDrive(-1, 0);
+                    }else{
+                        drivetrain.arcadeDrive(0, 0);
+                    }
+                }
+            }else{
+                if(drivetrain.getLeftDistance() > -700){
+                    drivetrain.arcadeDrive(-1, 0);
+                }else{
+                    drivetrain.arcadeDrive(0, 0);
+                }
+            }
+        }else if (counter < 230){
+            if(drivetrain.getLeftDistance() > -700){
+                drivetrain.arcadeDrive(-1, 0);
                 collector.drive();
             }else{
-                System.out.println("Counter:"+counter);
                 drivetrain.arcadeDrive(0, 0);
-                leftPanel.wilt();
-                rightPanel.wilt();
             }
-        }else if (counter < 260){
-            //catapult.engageMotors();
-            catapult.shoot();
-            drivetrain.arcadeDrive(0, 0);
-            leftPanel.wilt();
-            rightPanel.wilt();
         }else{
-            //Ratchet back
             drivetrain.arcadeDrive(0, 0);
             collector.stop();
+        }*/
+        catapult.update(30, 30);
+        drivetrain.lowGear();
+        //System.out.println("hot one ball");
+        switch (state) {
+            case kBlooming://starting state
+                vision.lookForHorizontalInfo();//sets the vision to look for the horizontal info
+                if (counter < 40) {
+                    //Wait for stuff to open
+                    leftPanel.wilt();
+                    rightPanel.wilt();
+                    backPanel.bloom();
+                    collector.bloom();
+                    collector.drive();
+                    System.out.println("counting up");
+                } else {
+                    System.out.println("going to processing");
+                    state = kProcessing;//wait for image processing
+                    counter = 0;
+                }
+                break;
+            case kProcessing:
+                System.out.println("processing");
+                if (vision.isHorizontalInfoUpdatedTwice() && !firstBallShot) {
+                    if (/*(System.currentTimeMillis() - autoStartTime) > 2750 && */
+                            (vision.isHorizontalDetectedFirstUpdate() || vision.isHorizontalDetectedSecondUpdate())) {
+                        System.out.println("\n***********************horizontal detected, shooting");
+                        state = kShooting;
+                    } else if ((System.currentTimeMillis() - autoStartTime) > 4750) {
+                        System.out.println("\n***********************horizontal not detected, shooting");
+                        state = kShooting;
+                    } else if (drivetrain.getRightDistance() <900) {
+                        System.out.println("moving on to driving forward");
+                        state = kDrivingForward;//drives forward
+                    }
+                }
+                break;
+            case kShooting:
+                firstBallShot = true;
+                catapult.shoot();
+                drivetrain.arcadeDrive(0, 0);
+                counter = 0;
+                state = kIdling;
+                System.out.println("*****SHOOTING");
+                break;
+            case kIdling://waits for the shooter to finish
+                if (counter < 80) {//TODO: test how long idling needs to go on
+                    drivetrain.arcadeDrive(0, 0);
+                } else if (drivetrain.getRightDistance() >880) {
+                    counter = 0;
+                    state = kStop;//if kGettingBall was already called (we already shot a ball), proceed to the end of autonomous
+                } else {
+                    state = kDrivingForward;//drives forward
+                    counter = 0;
+                }
+                break;
+            case kDrivingForward://drives forward
+                if (drivetrain.getRightDistance() <900) {
+                    drivetrain.arcadeDrive(-1, 0);//drive forwards
+                } else if (!firstBallShot) {
+                    state = kProcessing;//go back to processing and shoot the ball if its in the 2nd half
+                } else {
+                    drivetrain.arcadeDrive(0, 0);
+                    //state = kMobility;
+                    counter = 0;
+                    state = kStop;//stop the robot TODO: change to kMobility after testing everything
+                }
+                break;
+            case kMobility:
+                if (counter < 50) {
+                    drivetrain.arcadeDrive(-1, 0);//drive forward
+                } else {
+                    state = kStop;//stops the robot
+                    counter = 0;
+                }
+                break;
+            case kStop://stops the robot
+                drivetrain.arcadeDrive(0, 0);
+                break;
         }
     }
     
@@ -273,6 +447,9 @@ public class Robot extends IterativeRobot {
         backPanel.bloom();
         rightPanel.bloom();
         drivetrain.highGear();
+        
+        //Killing Beaglebone
+        vision.disconnect();
     }
     
     /**
@@ -281,7 +458,7 @@ public class Robot extends IterativeRobot {
     public void teleopPeriodic() {
         periodic();
         catapult.update();
-      
+       // System.out.println(drivetrain.getRightDistance());
         //catapult.drive(operatorController.getLeftY());
         
         //Drive the robot
@@ -310,10 +487,8 @@ public class Robot extends IterativeRobot {
             //catapult.disengageRatchet();
         
         if(button9.get()){
-            catapult.engage();
-        }//else if(button10.get()){
-            //catapult.engageMotors();
-        //}
+            catapult.retract();
+        }
 
         //Setting collector position
         if (button6.get()) {
@@ -375,6 +550,7 @@ public class Robot extends IterativeRobot {
      * This function is called periodically during test mode
      */
     public void testPeriodic() {
+        drivetrain.arcadeDrive(0, 0);
         compressor.start();
         
         collector.wilt();
@@ -386,9 +562,19 @@ public class Robot extends IterativeRobot {
         catapult.update();
         
         drivetrain.lowGear();
+        
+        if(button9.get()){
+            catapult.retract();
+        }
+        vision.lookForHorizontalInfo();
+        if(vision.isHorizontalInfoUpdated()){
+            System.out.println(vision.getHorizontalX());
+            System.out.println(vision.getHorizontalY());
+            System.out.println(vision.isHorizontalDetected());
+        }
     }
-    
+    public void disabledInit(){
+    }
     public void disabledPeriodic(){
-        //System.out.println("Vision:\t"+vision.getHorizontalDetected());
     }
 }
