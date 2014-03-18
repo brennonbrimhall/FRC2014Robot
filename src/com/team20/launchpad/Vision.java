@@ -16,7 +16,7 @@ import javax.microedition.io.SocketConnection;
  */
 public class Vision {
 
-    private boolean redBallDetected = false, blueBallDetected = false,
+    private boolean connecting = false, redBallDetected = false, blueBallDetected = false,
             horizontal = false, vertical = false, redBallInfoUpdated = false,
             blueBallInfoUpdated = false, horizontalInfoUpdated = false,
             verticalInfoUpdated = false, horizontalInfoUpdatedOnce = false,
@@ -26,10 +26,8 @@ public class Vision {
             blueBallX = 0, blueBallY = 0,
             horizontalX = 0, horizontalY = 0,
             verticalX = 0, verticalY = 0, mode = -1;
-    public final int CAMERA_PROCESSING_TIME = 400/*, THREAD_TIMEOUT_TIME = 15000000*/,
-            DATA_CYCLE_TIME = CAMERA_PROCESSING_TIME + 10, BALL_CENTERED_PIXELS_X = 160;//TODO: find the pixel range for "centered"
-    public final double BALL_CENTERED_TOLERANCE = .08;
-    //NetworkTable visionTable = NetworkTable.getTable("Vision");
+    public final int CAMERA_PROCESSING_TIME = 400,
+            DATA_CYCLE_TIME = CAMERA_PROCESSING_TIME + 10;
     private SocketConnection sc;
     private OutputStream os;
     private InputStream is;
@@ -44,48 +42,51 @@ public class Vision {
      * This MUST be called once so that this class starts writing to the
      * beaglebone
      */
-    /* public void startThread() {
-     if (!threadHasStarted) {
-     threadHasStarted = true;
-     //if(!st.isAlive()){
-     st.start();
-     }
-     }*/
-    public void startThread() {
-        if (threadHasStarted && !hasConnected) {
-            System.out.println("spawning a new vision thread");
+    public void start() {
+        if (!threadHasStarted && !hasConnected && !connecting) {
+            threadHasStarted = true;
+            resetData();
+            st.start();
+        } else if (threadHasStarted && !hasConnected && !connecting) {
+            threadHasStarted = true;
             resetData();
             createThread();
-            st.start();
-        } else if (!threadHasStarted) {
-            threadHasStarted = true;
             st.start();
         }
     }
 
-    /*public void endThread() {
-     if (threadHasStarted&&sc!=null&&is!=null&&os!=null) {
-     threadHasStarted = false;
-     try {
-     sc.close();
-     os.close();
-     is.close();
-     } catch (IOException ex) {
-     ex.printStackTrace();
-     }
-     }
-     }*/
-    public void disconnect() {
-
+    private void connect() {
         try {
-            if (hasConnected) {
-                sc.close();
-                os.close();
-                is.close();
+            if (!hasConnected && !connecting) {
+                connecting = true;
+                sc = (SocketConnection) Connector.open("socket://10.0.20.15:9090");
+                sc.setSocketOption(SocketConnection.LINGER, 5);
+                os = sc.openOutputStream();
+                is = sc.openInputStream();
+                hasConnected = true;
+                connecting = false;
+                System.out.println("Vision connection has been opened successfully");
             }
-            hasConnected = false;
         } catch (IOException ex) {
-            System.out.println("vision had trouble closing " + ex.toString());
+            System.out.println("Vision had trouble connecting to beaglebone " + ex.toString());
+            connecting = false;
+            hasConnected = false;
+        }
+    }
+
+    public void disconnect() {
+        if(sc==null||os==null||is==null){
+            System.out.println("vision hasnt been initialized, ending disconnect");
+            return;
+        }
+        try {
+            sc.close();
+            os.close();
+            is.close();
+            hasConnected = false;
+            System.out.println("Disconnected from the beaglebone successfully");
+        } catch (IOException ex) {
+            System.out.println("Vision had trouble closing " + ex.toString());
         }
 
     }
@@ -93,23 +94,24 @@ public class Vision {
     private void getData(int b) {
 
         try {
+            //sends first byte over to identify what info we want
             os.write(b);//0 horiz 1 vert 2 red 3 blue
             os.flush();
-
-            os.write(5);//ask for image processing data
+            //sends second byte over that asks for data
+           /* os.write(5);//ask for image processing data
             os.flush();
             //System.out.println("written to");
             int n;
-            do {
-            } while ((n = is.available()) == 0);
-            if (n == 6) {
-                if (is.read() == mode) {
-                    // System.out.println("reading into buffer");
-                    is.read(buffer);
+            do {//wait until data is sent
+                if (!hasConnected) {
+                    return;//get out of this method if we somehow lose connection
                 }
+            } while ((n = is.available()) == 0);
+            if (n == 6 && is.read() == mode) {
+                is.read(buffer);
             } else if (n > 6) {
                 is.skip(is.available());
-            }
+            }*/
         } catch (IOException e) {
             System.out.println("vision had trouble getting data " + e.toString());
         }
@@ -132,6 +134,9 @@ public class Vision {
 
     public void lookForBlueBallInfo() {
         mode = 3;
+    }
+    public void takeAPicture(){
+        mode = 4;
     }
 
     //processing
@@ -190,7 +195,7 @@ public class Vision {
         ret |= c;
         return ret >= 0 ? ret : (short) (ret + 256);
     }
-    
+
     public void resetData() {
         redBallDetected = false;
         blueBallDetected = false;
@@ -226,99 +231,37 @@ public class Vision {
     private void createThread() {
         st = new Thread() {
             public void run() {
-                //open connection
-                try {
-                    sc = (SocketConnection) Connector.open("socket://10.0.20.15:9090");
-                   
+                connect();
+                long startTime = System.currentTimeMillis();
+                long incrementalTime = startTime;
+                while (hasConnected) {
 
-                    sc.setSocketOption(SocketConnection.LINGER, 5);
-                    os = sc.openOutputStream();
-                    is = sc.openInputStream();
-                    hasConnected = true;
-                    System.out.println("Vision connection has been opened successfully");
-                    //System.out.println("OS and IS have been opened");
-                    
-                    long startTime = System.currentTimeMillis();
-                    long incrementalTime = startTime;
-
-                    while (hasConnected) {
-
-                        //falsify all infoUpdated so the class knows that its info is out of date
-                        if (System.currentTimeMillis() - incrementalTime > DATA_CYCLE_TIME + 50) {
-                            redBallInfoUpdated = false;
-                            blueBallInfoUpdated = false;
-                            horizontalInfoUpdated = false;
-                            verticalInfoUpdated = false;
-                            incrementalTime = System.currentTimeMillis();
-                        }
-                        //get data from the beaglebone
-                        //   System.out.println("vision is getting data");
-                        if (mode != -1) {
-                            getData(mode);
-                            // System.out.println("vision is processing data");
-                            processBuffer();
-                        }
-                        try {
-                            Thread.sleep(250);
-
-                            //time limit on connection
-                            /*if (System.currentTimeMillis() - startTime > THREAD_TIMEOUT_TIME) {
-                             System.out.println("Vision is closing comms");
-                             try {
-                             sc.close();
-                             os.close();
-                             is.close();
-                             } catch (IOException ex) {
-                             System.out.println("had trouble closing comms " + ex.toString());
-                             }
-                             break;
-                             }*/
-                        } catch (InterruptedException ex) {
-                            System.out.println("Thread was interrupted while sleeping");
-                        }
+                    //falsify all infoUpdated so the class knows that its info is out of date
+                    if (System.currentTimeMillis() - incrementalTime > DATA_CYCLE_TIME + 50) {
+                        redBallInfoUpdated = false;
+                        blueBallInfoUpdated = false;
+                        horizontalInfoUpdated = false;
+                        verticalInfoUpdated = false;
+                        incrementalTime = System.currentTimeMillis();
                     }
-                } catch (IOException e) {
-                    hasConnected = false;
-                    System.out.println("Vision had trouble opening comms " + e.toString());
-
+                    //get data from the beaglebone
+                    //   System.out.println("vision is getting data");
+                    if (mode != -1) {
+                        getData(mode);
+                        // System.out.println("vision is processing data");
+                       // processBuffer();
+                    }
+                    try {
+                        Thread.sleep(250);
+                    } catch (InterruptedException ex) {
+                        System.out.println("Thread was interrupted while sleeping " + ex.toString());
+                    }
                 }
 
             }
         };
     }
 
-    /*  public boolean isBallCentered(boolean red) {
-
-     if (red) {
-     if (!redBallInfoUpdated) {
-     System.out.println("Using outdated red ball info to return centered");
-     }
-     return (isXValCentered(redBallX));
-     } else {
-     if (!blueBallInfoUpdated) {
-     System.out.println("Using outdated blue ball info to return centered");
-     }
-     return isXValCentered(blueBallX);
-     }
-     }
-
-     private boolean isXValCentered(int x) {
-     return x * (1 - BALL_CENTERED_TOLERANCE) < BALL_CENTERED_PIXELS_X && x * (1 + BALL_CENTERED_TOLERANCE) > BALL_CENTERED_PIXELS_X;
-     }
-
-     public boolean isHorizontalCentered() {
-     if (!this.isHorizontalInfoUpdated()) {
-     System.out.println("using outdated horizontal info to return centered");
-     }
-     return isXValCentered(getHorizontalX());
-     }
-
-     public boolean isVerticalCentered() {
-     if (!this.isVerticalInfoUpdated()) {
-     System.out.println("using outdated horizontal info to return centered");
-     }
-     return isXValCentered(getVerticalX());
-     }*/
     //getters
     public int getMode() {
         return mode;
@@ -326,6 +269,10 @@ public class Vision {
 
     public boolean hasConnected() {
         return hasConnected;
+    }
+
+    public boolean isHorizontalDetectedWithinFirstTwoUpdates() {
+        return isHorizontalInfoUpdatedTwice() && (isHorizontalDetectedFirstUpdate() || isHorizontalDetectedSecondUpdate());
     }
 
     public boolean isHorizontalInfoUpdated() {

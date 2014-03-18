@@ -6,6 +6,7 @@ package com.team20.launchpad;
 
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
+import edu.wpi.first.wpilibj.DriverStationLCD;
 import edu.wpi.first.wpilibj.Talon;
 
 /**
@@ -33,6 +34,7 @@ public class Catapult extends Subsystem {
     
     private int state = 1;
     private int counter;
+    boolean didTimeout = false;
     
     Talon talon1 = new Talon(7);
     Talon talon2 = new Talon(8);
@@ -62,6 +64,15 @@ public class Catapult extends Subsystem {
                 //Driving catapult down
                 drive(1.0);
             }else{
+                if(counter < 100){
+                    System.out.println("Catapult fully retracted.");
+                    DriverStationLCD.getInstance().println(DriverStationLCD.Line.kUser1, 1, "Fully retracted.");
+                    DriverStationLCD.getInstance().updateLCD();
+                }else{
+                    DriverStationLCD.getInstance().println(DriverStationLCD.Line.kUser1, 1, "Retract timed out.");
+                    DriverStationLCD.getInstance().updateLCD();
+                    System.out.println("Catapult retract timed out.");
+                }
                 //Move on to disengaging
                 state++;
             }
